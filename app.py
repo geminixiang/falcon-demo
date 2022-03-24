@@ -5,6 +5,8 @@ import arrow
 import gevent
 from gevent import socket
 
+gevent.monkey.patch_all()
+
 
 def number_loop(end):
     result = 1
@@ -33,7 +35,8 @@ class Timestamp:
     def on_get(self, req, resp):
         """GET SYSTEM TIME"""
         payload = {}
-        payload['utc'] = arrow.utcnow().format('YYYY-MM-DD HH:mm:SS')
+        payload['utc'] = arrow.utcnow().to('Asia/Taipei'). \
+            format('YYYY-MM-DD HH:mm:SS')
         resp.body = json.dumps(payload)
         resp.status = falcon.HTTP_200
 
@@ -46,11 +49,13 @@ class Ping(object):
 
 class Crawler(object):
     def on_get(self, req, resp):
-        """gevent spawn a little job"""
-        urls = ['www.google.com', 'www.example.com', 'www.python.org']
-        urls *= 100
+        """request 10 website at the same time"""
+        urls = ['www.google.com', 'www.example.com', 'www.python.org',
+                'www.netflix.com', 'hackmd.io', 'medium.com',
+                'www.bing.com', 'aws.amazon.com', 'www.ithome.com.tw',
+                'www.wikipedia.org']
         jobs = [gevent.spawn(socket.gethostbyname, url) for url in urls]
-        _ = gevent.joinall(jobs, timeout=2)
+        _ = gevent.joinall(jobs, timeout=5)
         resp.status = falcon.HTTP_200
         resp.text = json.dumps([job.value for job in jobs])
 
@@ -59,7 +64,7 @@ class Factorial(object):
 
     def on_get(self, req, resp, end):
         jobs = [gevent.spawn(number_loop, i) for i in range(1, int(end) + 1)]
-        _ = gevent.joinall(jobs, timeout=2)
+        _ = gevent.joinall(jobs, timeout=5)
         resp.status = falcon.HTTP_200
         resp.text = json.dumps([job.value for job in jobs])
 
