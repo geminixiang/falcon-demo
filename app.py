@@ -36,15 +36,9 @@ class Timestamp:
         """GET SYSTEM TIME"""
         payload = {}
         payload['utc'] = arrow.utcnow().to('Asia/Taipei'). \
-            format('YYYY-MM-DD HH:mm:SS')
+            format('YYYY-MM-DD HH:mm:ss')
         resp.body = json.dumps(payload)
         resp.status = falcon.HTTP_200
-
-
-class Ping(object):
-    def on_get(self, req, resp):
-        resp.status = falcon.HTTP_200
-        resp.text = json.dumps('pong!')
 
 
 class Crawler(object):
@@ -62,13 +56,14 @@ class Crawler(object):
 
 class Factorial(object):
 
-    def on_get(self, req, resp, end):
+    def on_get(self, req, resp, **kwargs):
+        end = kwargs['end']
         jobs = [gevent.spawn(number_loop, i) for i in range(1, int(end) + 1)]
         _ = gevent.joinall(jobs, timeout=5)
         resp.status = falcon.HTTP_200
         resp.text = json.dumps([job.value for job in jobs])
 
-    def on_post(self, req, resp, end):
+    def on_post(self, req, resp, **kwargs):
         num = req.media.get("num")
         resp.media = {
             "message": num
@@ -113,7 +108,6 @@ app = falcon.App()
 
 app.add_route('/', About())
 app.add_route('/time', Timestamp())
-app.add_route('/ping', Ping())
 app.add_route('/crawler', Crawler())
 app.add_route('/download', DownloadFile())
 app.add_route('/factorial/{end}', Factorial())
