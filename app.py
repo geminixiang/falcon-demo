@@ -3,18 +3,9 @@ import json
 import csv
 import arrow
 import gevent
-from gevent import socket
+from gevent import socket, monkey
 
-gevent.monkey.patch_all()
-
-
-def number_loop(end):
-    result = 1
-    if end == 1:
-        return 1
-    for i in range(1, end):
-        result *= i
-    return result
+monkey.patch_all()
 
 
 class About:
@@ -30,14 +21,22 @@ class About:
 
         resp.media = quote
 
+    def on_post(self, req, resp):
+        num = req.media.get("num")
+        resp.media = {
+            "You post number is": num
+        }
+        resp.status = falcon.HTTP_200
+
 
 class Timestamp:
     def on_get(self, req, resp):
         """GET SYSTEM TIME"""
+        print(req.method, req.host, req.port)
         payload = {}
         payload['utc'] = arrow.utcnow().to('Asia/Taipei'). \
             format('YYYY-MM-DD HH:mm:ss')
-        resp.body = json.dumps(payload)
+        resp.text = json.dumps(payload)
         resp.status = falcon.HTTP_200
 
 
@@ -56,19 +55,25 @@ class Crawler(object):
 
 class Factorial(object):
 
+    def number_loop(self, end):
+        if end == 1:
+            return 1
+        if end < 1:
+            return "NA"
+
+        return end * self.number_loop(end - 1)
+
     def on_get(self, req, resp, **kwargs):
         end = kwargs['end']
-        jobs = [gevent.spawn(number_loop, i) for i in range(1, int(end) + 1)]
-        _ = gevent.joinall(jobs, timeout=5)
+
+        if not end.isdigit():
+            raise falcon.HTTPBadRequest(title='Param must be a NUMBER')
+
+        end = int(end) + 1
+        jobs = [gevent.spawn(self.number_loop, i) for i in range(1, end)]
+        gevent.joinall(jobs, timeout=5)
         resp.status = falcon.HTTP_200
         resp.text = json.dumps([job.value for job in jobs])
-
-    def on_post(self, req, resp, **kwargs):
-        num = req.media.get("num")
-        resp.media = {
-            "message": num
-        }
-        resp.status = falcon.HTTP_200
 
 
 class DownloadFile:
@@ -90,7 +95,7 @@ class DownloadFile:
 
         previous = 1
         current = 0
-        for i in range(n+1):
+        for i in range(n + 1):
             writer.writerow((i, current))
             previous, current = current, current + previous
 
@@ -103,11 +108,14 @@ class DownloadFile:
         resp.stream = self.fibonacci_generator()
 
 
-app = falcon.App()
+def create():
+    app = falcon.App()
+    app.add_route('/info', About())
+    app.add_route('/time', Timestamp())
+    app.add_route('/crawler', Crawler())
+    app.add_route('/download', DownloadFile())
+    app.add_route('/factorial/{end}', Factorial())
+    return app
 
 
-app.add_route('/', About())
-app.add_route('/time', Timestamp())
-app.add_route('/crawler', Crawler())
-app.add_route('/download', DownloadFile())
-app.add_route('/factorial/{end}', Factorial())
+app = create()
