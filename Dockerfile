@@ -1,9 +1,16 @@
-FROM python:3.10.2
+FROM python:3.10.2-alpine as base
+FROM base as builder
 
-WORKDIR /workspace/
+RUN apk add libffi-dev gcc musl-dev make
+
+COPY requirements.txt /requirements.txt
+RUN pip install --upgrade pip
+RUN pip install --user -r /requirements.txt
+
+FROM base
+COPY --from=builder /root/.local /root/.local
+
 COPY . /workspace/
-
-RUN pip install -r requirements.txt
+WORKDIR /workspace/
 
 EXPOSE 8000
-CMD exec gunicorn -c gunicorn_config.py app:app

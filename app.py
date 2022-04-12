@@ -4,7 +4,6 @@ import csv
 import arrow
 import gevent
 from gevent import socket, monkey
-from gevent.pool import Pool
 
 
 monkey.patch_all()
